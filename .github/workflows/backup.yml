@@ -1,4 +1,4 @@
-name: Fetch and Merge JSON Data
+name: Backup deflock JSON data
 
 on:
   schedule:
@@ -8,6 +8,8 @@ on:
 jobs:
   fetch-and-merge:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
