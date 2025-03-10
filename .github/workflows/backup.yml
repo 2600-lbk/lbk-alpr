@@ -1,0 +1,62 @@
+name: Fetch and Merge JSON Data
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Runs daily at midnight UTC
+  workflow_dispatch:  # Allows manual trigger
+
+jobs:
+  fetch-and-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Fetch deflock data, and merge.
+        run: |
+          mkdir -p locations
+          
+          # Define an array of URLs
+          URLS=(
+            "https://cdn.deflock.me/regions/20/-120.json"
+            "https://cdn.deflock.me/regions/20/-100.json"
+          )
+          
+          # Fetch and merge all JSON arrays
+          MERGED_JSON=$(jq -s 'add' < <(for URL in "${URLS[@]}"; do curl -s "$URL"; echo; done))
+          
+          # Deduplicate using a unique identifier (assumes each object has an "id" field)
+          DEDUPLICATED_JSON=$(jq -c 'unique_by(.id)' <<< "$MERGED_JSON")
+          
+          # Get today's date
+          TODAY=$(date +%F)
+          LATEST_FILE="locations/latest.json"
+          DATE_FILE="locations/$TODAY.json"
+          
+          # Check if latest.json exists
+          if [ -f "$LATEST_FILE" ]; then
+          # Compare with existing latest.json
+          if ! diff -q <(jq -cS . "$LATEST_FILE") <(jq -cS . <<< "$DEDUPLICATED_JSON") > /dev/null; then
+          echo "New data detected, updating latest.json..."
+          echo "$DEDUPLICATED_JSON" | jq '.' > "$LATEST_FILE"
+          echo "$DEDUPLICATED_JSON" | jq '.' > "$DATE_FILE"
+          else
+          echo "No changes detected. Skipping commit."
+          exit 0
+          fi
+          else
+          echo "No latest.json found, creating new one..."
+          echo "$DEDUPLICATED_JSON" | jq '.' > "$LATEST_FILE"
+          echo "$DEDUPLICATED_JSON" | jq '.' > "$DATE_FILE"
+          fi
+
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add locations/latest.json locations/*.json
+          git diff --staged --quiet || (git commit -m "Update JSON data for $(date +%F)" && git push)

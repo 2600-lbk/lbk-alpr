@@ -1,0 +1,23 @@
+.DS_Store
+
+# IntelliJ artifacts
+.idea
+
+# Build artifacts
+.cache
+dist
+*.tsbuildinfo
+tmpbs
+
+# Node artifacts
+node_modules
+
+# Secrets
+.env
+
+# Database
+*.sqlite
+*.db*
+
+# Local Data
+data
